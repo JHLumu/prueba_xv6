@@ -37,3 +37,6 @@ extern void* memset(void*, int, uint);
 extern void* malloc(uint);
 extern void free(void*);
 extern int atoi(const char*);
+
+// date.c 
+extern int date(struct rtcdate*);

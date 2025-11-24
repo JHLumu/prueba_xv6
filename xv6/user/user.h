@@ -40,3 +40,6 @@ extern int atoi(const char*);
 
 // date.c 
 extern int date(struct rtcdate*);
+
+// dup2.c 
+extern int dup2(int, int);

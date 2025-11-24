@@ -443,3 +443,31 @@ sys_pipe(void)
   fd[1] = fd1;
   return 0;
 }
+
+int
+sys_dup2(void)
+{
+  struct file *f;
+  int oldfd, newfd;
+  struct proc *curproc = myproc();
+
+  if(argint(0, &oldfd) < 0 || argint(1, &newfd) < 0)
+    return -1;
+
+  if(oldfd < 0 || oldfd >= NOFILE || (f = curproc->ofile[oldfd]) == 0)
+    return -1;
+
+  if(newfd < 0 || newfd >= NOFILE)
+    return -1;
+
+  if(oldfd == newfd)
+    return newfd;
+
+  if(curproc->ofile[newfd])
+    fileclose(curproc->ofile[newfd]);
+
+  filedup(f);
+  curproc->ofile[newfd] = f;
+
+  return newfd;
+}

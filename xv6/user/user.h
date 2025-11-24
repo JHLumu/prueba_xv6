@@ -3,8 +3,8 @@ struct rtcdate;
 
 // system calls
 extern int fork(void);
-extern int exit(void) __attribute__((noreturn));
-extern int wait(void);
+extern int exit(int) __attribute__((noreturn));
+extern int wait(int*);
 extern int pipe(int*);
 extern int write(int, const void*, int);
 extern int read(int, void*, int);
@@ -38,8 +38,14 @@ extern void* malloc(uint);
 extern void free(void*);
 extern int atoi(const char*);
 
-// date.c 
+// Ej1
 extern int date(struct rtcdate*);
 
-// dup2.c 
+// Ej2
 extern int dup2(int, int);
+
+// Ej3
+#define WIFEXITED(status)   (((status) & 0x7f) == 0)
+#define WEXITSTATUS(status) (((status) & 0xff00) >> 8)
+#define WIFSIGNALED(status) (((status) & 0x7f) != 0)
+#define WEXITTRAP(status)   (((status) & 0x7f) - 1)

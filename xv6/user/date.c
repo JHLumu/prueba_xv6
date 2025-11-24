@@ -10,10 +10,10 @@ main(int argc, char *argv[])
 
   if(date(&r)) {
     printf(2, "date failed\n");
-    exit();
+    exit(0);
   }
 
   printf(1, "%d-%d-%d %d:%d:%d\n", r.year, r.month, r.day, r.hour, r.minute, r.second);
   
-  exit();
+  exit(0);
 }

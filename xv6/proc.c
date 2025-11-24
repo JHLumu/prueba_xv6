@@ -225,7 +225,7 @@ fork(void)
 // An exited process remains in the zombie state
 // until its parent calls wait() to find out it exited.
 void
-exit(void)
+exit(int status)
 {
   struct proc *curproc = myproc();
   struct proc *p;
@@ -246,6 +246,8 @@ exit(void)
   iput(curproc->cwd);
   end_op();
   curproc->cwd = 0;
+
+  curproc->xstate = status;
 
   acquire(&ptable.lock);
 
@@ -273,7 +275,7 @@ exit(void)
 // Wait for a child process to exit and return its pid.
 // Return -1 if this process has no children.
 int
-wait(void)
+wait(int *status)
 {
   struct proc *p;
   int havekids, pid;
@@ -293,6 +295,10 @@ wait(void)
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir, 0); // User zone deleted before
+        if(status != 0 && copyout(curproc->pgdir, (uint)status, &p->xstate, sizeof(int)) < 0){
+             release(&ptable.lock);
+             return -1;
+        }
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;

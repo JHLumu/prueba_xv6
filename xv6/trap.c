@@ -84,8 +84,23 @@ trap(struct trapframe *tf)
     {
       uint va;
       char *mem;
+      struct proc *curproc;
       
       va = rcr2();
+      curproc = myproc();
+
+      if(curproc == 0) {
+        panic("page fault without process");
+      }
+
+      if (va >= curproc->sz || (tf->err & PTE_P)) {
+          cprintf("pid %d %s: trap %d err %d on cpu %d "
+                  "eip 0x%x addr 0x%x--kill proc\n",
+                  curproc->pid, curproc->name, tf->trapno,
+                  tf->err, cpuid(), tf->eip, va);
+          curproc->killed = 1;
+          break;
+      }
       
       mem = kalloc();
       if(mem == 0){

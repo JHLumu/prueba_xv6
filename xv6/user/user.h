@@ -23,6 +23,8 @@ extern int getpid(void);
 extern char* sbrk(int);
 extern int sleep(int);
 extern int uptime(void);
+extern int getprio(int);
+extern int setprio(int, unsigned int);
 
 // ulib.c
 extern int stat(const char*, struct stat*);
@@ -49,3 +51,4 @@ extern int dup2(int, int);
 #define WEXITSTATUS(status) (((status) & 0xff00) >> 8)
 #define WIFSIGNALED(status) (((status) & 0x7f) != 0)
 #define WEXITTRAP(status)   (((status) & 0x7f) - 1)
+

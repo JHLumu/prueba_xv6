@@ -113,3 +113,25 @@ sys_date(void)
   
   return 0;
 }
+
+int
+sys_getprio(void)
+{
+  int pid;
+  // El primer argumento es el PID
+  if(argint(0, &pid) < 0)
+    return -1;
+  
+  return getprio(pid);
+}
+
+int
+sys_setprio(void)
+{
+  int pid, prio;
+  // Primer argumento PID, segundo prioridad
+  if(argint(0, &pid) < 0 || argint(1, &prio) < 0)
+    return -1;
+
+  return setprio(pid, prio);
+}

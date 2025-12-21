@@ -126,6 +126,30 @@ found:
   return p;
 }
 
+// Función auxiliar para quitar un proceso de una cola específica
+static void
+remove_from_prio_queue(struct proc *p, int prio)
+{
+  struct proc *curr = ptable.ready[prio].head;
+  struct proc *prev = 0;
+
+  while(curr){
+    if(curr == p){
+      if(prev){
+        prev->next = curr->next;
+      } else {
+        ptable.ready[prio].head = curr->next;
+      }
+      if(curr == ptable.ready[prio].tail){
+        ptable.ready[prio].tail = prev;
+      }
+      break;
+    }
+    prev = curr;
+    curr = curr->next;
+  }
+}
+
 // Insertar un proceso al final de la cola de su prioridad
 void
 insert_prio_queue(struct proc *p)
@@ -153,6 +177,57 @@ remove_prio_queue_head(int prio)
       ptable.ready[prio].tail = 0;
   }
   return p;
+}
+
+int
+getprio(int pid)
+{
+  struct proc *p;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      int prio = p->priority;
+      release(&ptable.lock);
+      return prio;
+    }
+  }
+  release(&ptable.lock);
+  return -1;
+}
+
+int
+setprio(int pid, unsigned int priority)
+{
+  struct proc *p;
+
+  // 1. Validar rango
+  if(priority >= NPRIO)
+    return -1;
+
+  acquire(&ptable.lock);
+  for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
+    if(p->pid == pid){
+      
+      // Si el proceso está listo para ejecutarse, hay que moverlo
+      if(p->state == RUNNABLE){
+        // Sacar de la cola antigua
+        remove_from_prio_queue(p, p->priority);
+        // Actualizar prioridad
+        p->priority = priority;
+        // Insertar en la cola nueva
+        insert_prio_queue(p);
+      } else {
+        // Si no está en cola, solo cambiamos el valor
+        p->priority = priority;
+      }      
+
+      release(&ptable.lock);
+      return 0;
+    }
+  }
+  release(&ptable.lock);
+  return -1; // PID no encontrado
 }
 
 //PAGEBREAK: 32
@@ -526,9 +601,10 @@ wakeup1(void *chan)
   struct proc *p;
 
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
-    if(p->state == SLEEPING && p->chan == chan)
+    if(p->state == SLEEPING && p->chan == chan){
       p->state = RUNNABLE;
       insert_prio_queue(p);
+    }
 }
 
 // Wake up all processes sleeping on chan.

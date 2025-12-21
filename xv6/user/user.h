@@ -3,10 +3,16 @@ struct rtcdate;
 
 // system calls
 extern int fork(void);
-extern int exit(int) __attribute__((noreturn));
-extern int wait(int*);
+
+
+//extern int exit(void) __attribute__((noreturn));
+extern int exit(int) __attribute__((noreturn)); /** Boletin 1 Ejercicio 3 */
+
+//extern int wait(void);
+extern int wait(int*); /** Boletin 1 Ejercicio 3 */
+
 extern int pipe(int*);
-extern int write(int, const void*, int);
+extern int write(int, const void*, int); 
 extern int read(int, void*, int);
 extern int close(int);
 extern int kill(int);
@@ -40,10 +46,10 @@ extern void* malloc(uint);
 extern void free(void*);
 extern int atoi(const char*);
 
-// Ej1
+/** Boletin 1 Ejercicio 1 */
 extern int date(struct rtcdate*);
 
-// Ej2
+/** Boletin 1 Ejercicio 2 */
 extern int dup2(int, int);
 
 // Ej3

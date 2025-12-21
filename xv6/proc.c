@@ -346,14 +346,26 @@ fork(void)
 void
 exit(int status)
 {
+
+  /**
+   * Declaración de variables. Se recupera el estado
+   * del proceso actual.
+   */
   struct proc *curproc = myproc();
   struct proc *p;
   int fd;
 
+  /**
+   * Si el proceso actual es igual al proceso raíz, se 
+   * detiene inmediatamente la función.
+   */
   if(curproc == initproc)
     panic("init exiting");
 
-  // Close all open files.
+  /**
+   * Cierra todos los archivos abiertos que tenga en su
+   * tabla de descriptores.
+   */
   for(fd = 0; fd < NOFILE; fd++){
     if(curproc->ofile[fd]){
       fileclose(curproc->ofile[fd]);
@@ -361,19 +373,37 @@ exit(int status)
     }
   }
 
+  /**
+   * Libera el directorio actual del proceso (decrementa su contador).
+   * Se realiza en una transacción para que sea atómica.
+   */
   begin_op();
   iput(curproc->cwd);
   end_op();
   curproc->cwd = 0;
 
-  curproc->xstate = status;
+  /**  Boletin 3 Ejercicio 1 **
+   * Se guarda el estado en la estructura que almacena
+   * el estado del proceso actual.
+   */
+  curproc->status = status;
 
+  /**
+   * Acceso en exclusión mutua a la tabla global de procesos.
+   */
   acquire(&ptable.lock);
 
-  // Parent might be sleeping in wait().
+  /**
+   * Despierta al proceso padre, dormido por un wait(). De esta forma al 
+   * despertarse, recogerá el status almacenado por el proceso hijo.
+   */
   wakeup1(curproc->parent);
 
-  // Pass abandoned children to init.
+  /**
+   * Si el proceso actual tiene procesos hijos, para evita que queden
+   * huerfanos, se les asigna como padre el proceso init. Si el proceso
+   * hijo estaba en modo zombie, se despierta al proceso padre para solucionarlo.
+   */
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
     if(p->parent == curproc){
       p->parent = initproc;
@@ -396,13 +426,22 @@ exit(int status)
 int
 wait(int *status)
 {
+  /**
+   * Declaración de variables. Se recupera el
+   * estaod del proceso actual.
+   */
   struct proc *p;
   int havekids, pid;
   struct proc *curproc = myproc();
 
+  /** Acceso en exclusión mutua. */
   acquire(&ptable.lock);
   for(;;){
-    // Scan through table looking for exited children.
+    /**
+     * Recorre la tabla de procesos global
+     * en busca de procesos hijos que estén
+     * en estado zombi.
+     */
     havekids = 0;
     for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
       if(p->parent != curproc)
@@ -414,10 +453,15 @@ wait(int *status)
         kfree(p->kstack);
         p->kstack = 0;
         freevm(p->pgdir, 0); // User zone deleted before
-        if(status != 0 && copyout(curproc->pgdir, (uint)status, &p->xstate, sizeof(int)) < 0){
-             release(&ptable.lock);
-             return -1;
+
+        /**
+         * Si el estado es distinto de null, el estado de salida es 
+         * igual al del puntero.
+         */
+        if (status != NULL) {
+            *status = p->status;
         }
+       
         p->pid = 0;
         p->parent = 0;
         p->name[0] = 0;

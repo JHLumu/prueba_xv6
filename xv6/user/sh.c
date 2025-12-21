@@ -167,6 +167,12 @@ main(void)
     if(fork1() == 0)
       runcmd(parsecmd(buf));
 
+    /** Boletin 2 Ejercicio 3 
+     * Se declara la variable status para obtener
+     * el estado devuelto por el último comando ejecutado
+     * e imprimirlo por pantalla.
+    */
+
     int status;
     wait(&status);
     printf(1, "Output code: %d\n", status);

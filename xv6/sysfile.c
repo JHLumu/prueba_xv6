@@ -447,26 +447,66 @@ sys_pipe(void)
 int
 sys_dup2(void)
 {
+  //Inicialización de las variables.
   struct file *f;
   int oldfd, newfd;
+
+  /** 
+   * myproc() es una función del kernel de xv6, y es utilizada para encontrar
+   * el proceso actual en el procesador. Para ello, deshabilita previamente las
+   * interrupciones, evitando posibles condiciones de carrera.
+   */
   struct proc *curproc = myproc();
 
+  /**
+   * Si al recuperar los argumentos de la pila del usuario se ha producido un error,
+   * la función finaliza informando del error con -1.
+   */
   if(argint(0, &oldfd) < 0 || argint(1, &newfd) < 0)
     return -1;
 
+  /**
+   * Se comprueba si oldfd es válido. Para ello, se verifica si está en el rango de valores
+   * válido y si se encuentra abierto. En caso de que no sea así, informa del error devolviendo
+   * -1.
+   */
   if(oldfd < 0 || oldfd >= NOFILE || (f = curproc->ofile[oldfd]) == 0)
     return -1;
 
+
+  /**
+   * Se comprueba si newfd es válido. Para ello, se verifica si está en el rango de valores válido.
+   * En caso contrario se informa del error devolviendo -1.
+   */
   if(newfd < 0 || newfd >= NOFILE)
     return -1;
 
+  /**
+   * La especificación de dup2() comenta que, en caso de que ambos descriptores sean iguales, no se debe hacer nada más.
+   * Se devuelve el descriptor de archivo.
+   */
   if(oldfd == newfd)
     return newfd;
 
+  /**
+   * La especificación de dup2() comenta que, en caso de que el descriptor de archivo newfd esté previamente abierto, se cierra para
+   * poder reutilizarse.
+   *  */  
   if(curproc->ofile[newfd])
     fileclose(curproc->ofile[newfd]);
 
+  /**
+   * xv6 mantiene una estructura global ftable, donde cada entrada es un struct file, que representa un archivo abierto.
+   * Esta estructura almacena, entre otras cosas, un contador de referencias hacia este archivo, es decir, el número de 
+   * descriptores de archivo que apuntan hacia él. Este contador existe para poder liberar este archivo de memoria únicamente
+   * cuando sea seguro (contador igual a cero).
+   */
   filedup(f);
+
+  /**
+   * Se actualiza la tabla de descriptores de archivos del proceso actual para que newfd apunte a la misma
+   * struct file que oldfd.
+   */
   curproc->ofile[newfd] = f;
 
   return newfd;

@@ -40,11 +40,19 @@ trap(struct trapframe *tf)
 {
   if(tf->trapno == T_SYSCALL){
     if(myproc()->killed)
-      exit(-1);
+      /** Boletin 1 Ejercicio 3
+       * En el caso de que el programa finalice por un trap, se devuelve el número del
+       * trap causante.  Para evitar la ambigüedad con la finalización normal de un proceso, 
+       * se le suma 1.
+       * 
+       */
+      exit(tf->trapno + 1);
+
     myproc()->tf = tf;
     syscall();
     if(myproc()->killed)
-      exit(-1);
+      /** Boletin 1 Ejercicio 3 */
+      exit(tf->trapno + 1);
     return;
   }
 
@@ -80,19 +88,23 @@ trap(struct trapframe *tf)
     lapiceoi();
     break;
 
+  /** 
+   * Boletin 2 Ejercicio 1
+   * Tratamiento de la excepción producida
+   *  por fallo de página 
+   */
   case T_PGFLT:
     {
       uint va;
       char *mem;
       struct proc *curproc;
       
+      /** Se obtiene la dirección virtual causante de la excepción. */
       va = rcr2();
       curproc = myproc();
-
-      if(curproc == 0) {
-        panic("page fault without process");
-      }
-
+      /** Si la dirección virtual causante es mayor que el tamaño del proceso
+       * , o la excepción se debe a una violación de permisos, se mata al proceso.
+       */
       if (va >= curproc->sz || (tf->err & PTE_P)) {
           cprintf("pid %d %s: trap %d err %d on cpu %d "
                   "eip 0x%x addr 0x%x--kill proc\n",
@@ -102,6 +114,20 @@ trap(struct trapframe *tf)
           break;
       }
       
+      /** Si la dirección virtual causante está contenida en la página de guarda o accede
+       * a la zona de memoria destinada al kernel, se mata al proceso.
+       */
+      if ((PGROUNDDOWN(va) == curproc->pg) || (va >= KERNBASE)) {
+          cprintf("pid %d %s: trap %d err %d on cpu %d "
+                  "eip 0x%x addr 0x%x--kill proc\n",
+                  curproc->pid, curproc->name, tf->trapno,
+                  tf->err, cpuid(), tf->eip, va);
+          curproc->killed = 1;
+          break;
+      }
+
+     
+      /** Se reserva memoria para la página */
       mem = kalloc();
       if(mem == 0){
         cprintf("lazy alloc: out of memory\n");
@@ -110,11 +136,11 @@ trap(struct trapframe *tf)
       }
       memset(mem, 0, PGSIZE);
       
+      /** Se mapea esta memoria reservada con la dirección virtual causante del fallo. */
       if(mappages(myproc()->pgdir, (char*)PGROUNDDOWN(va), PGSIZE, V2P(mem), PTE_W|PTE_U) < 0){
         cprintf("lazy alloc: mappages failed\n");
         kfree(mem);
         myproc()->killed = 1;
-        break;
       }
       break; 
     }
@@ -139,7 +165,8 @@ trap(struct trapframe *tf)
   // (If it is still executing in the kernel, let it keep running
   // until it gets to the regular system call return.)
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
-    exit(-1);
+     /** Boletin 1 Ejercicio 3 */
+      exit(tf->trapno + 1);
 
   // Force process to give up CPU on clock tick.
   // If interrupts were on while locks held, would need to check nlock.
@@ -149,5 +176,6 @@ trap(struct trapframe *tf)
 
   // Check if the process has been killed since we yielded
   if(myproc() && myproc()->killed && (tf->cs&3) == DPL_USER)
-    exit(-1);
+     /** Boletin 1 Ejercicio 3 */
+      exit(tf->trapno + 1);
 }

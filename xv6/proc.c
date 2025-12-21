@@ -7,9 +7,17 @@
 #include "proc.h"
 #include "spinlock.h"
 
+#define NPRIO 10      // niveles de prioridad
+
+struct proc_list {
+  struct proc *head;
+  struct proc *tail;
+};
+
 struct {
   struct spinlock lock;
   struct proc proc[NPROC];
+  struct proc_list ready[NPRIO];
 } ptable;
 
 static struct proc *initproc;
@@ -89,6 +97,9 @@ found:
   p->state = EMBRYO;
   p->pid = nextpid++;
 
+  p->priority = 5;      // Prioridad por defecto;
+  p->next = 0;
+
   release(&ptable.lock);
 
   // Allocate kernel stack.
@@ -112,6 +123,35 @@ found:
   memset(p->context, 0, sizeof *p->context);
   p->context->eip = (uint)forkret;
 
+  return p;
+}
+
+// Insertar un proceso al final de la cola de su prioridad
+void
+insert_prio_queue(struct proc *p)
+{
+  if(p->priority < 0 || p->priority >= NPRIO)
+    panic("insert_prio_queue: prioridad incorrecta");
+
+  p->next = 0;
+  if(ptable.ready[p->priority].tail){
+    ptable.ready[p->priority].tail->next = p;
+  } else {
+    ptable.ready[p->priority].head = p;
+  }
+  ptable.ready[p->priority].tail = p;
+}
+
+// Extraer el primer proceso de la cola de una prioridad dada
+struct proc*
+remove_prio_queue_head(int prio)
+{
+  struct proc *p = ptable.ready[prio].head;
+  if(p){
+    ptable.ready[prio].head = p->next;
+    if(ptable.ready[prio].head == 0)
+      ptable.ready[prio].tail = 0;
+  }
   return p;
 }
 
@@ -149,6 +189,7 @@ userinit(void)
   acquire(&ptable.lock);
 
   p->state = RUNNABLE;
+  insert_prio_queue(p);
 
   release(&ptable.lock);
 }
@@ -200,6 +241,8 @@ fork(void)
   np->parent = curproc;
   *np->tf = *curproc->tf;
 
+  np->priority = curproc->priority;     // Heredar prioridad
+
   // Clear %eax so that fork returns 0 in the child.
   np->tf->eax = 0;
 
@@ -215,6 +258,7 @@ fork(void)
   acquire(&ptable.lock);
 
   np->state = RUNNABLE;
+  insert_prio_queue(np);
 
   release(&ptable.lock);
 
@@ -334,6 +378,7 @@ scheduler(void)
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
+  int prio;
 
   for(;;){
     // Enable interrupts on this processor.
@@ -341,23 +386,34 @@ scheduler(void)
 
     // Loop over process table looking for process to run.
     acquire(&ptable.lock);
-    for(p = ptable.proc; p < &ptable.proc[NPROC]; p++){
-      if(p->state != RUNNABLE)
-        continue;
 
-      // Switch to chosen process.  It is the process's job
-      // to release ptable.lock and then reacquire it
-      // before jumping back to us.
-      c->proc = p;
-      switchuvm(p);
-      p->state = RUNNING;
+    // Recorremos las colas de prioridad de mayor (0) a menor (NPRIO-1)
+    for(prio = 0; prio < NPRIO; prio++){
+      if(ptable.ready[prio].head){
+        // Encontramos un proceso en esta prioridad
+        p = remove_prio_queue_head(prio); // Sacamos el proceso de la cola [cite: 329, 398]
 
-      swtch(&(c->scheduler), p->context);
-      switchkvm();
+        if(p->state != RUNNABLE){
+           // Sanity check, no debería ocurrir si gestionamos bien las colas
+           panic("scheduler: proceso no RUNNABLE en cola");
+        }
 
-      // Process is done running for now.
-      // It should have changed its p->state before coming back.
-      c->proc = 0;
+        // Switch to chosen process.
+        c->proc = p;
+        switchuvm(p);
+        p->state = RUNNING;
+
+        swtch(&(c->scheduler), p->context);
+        switchkvm();
+
+        // Process is done running for now.
+        c->proc = 0;
+
+        // IMPORTANTE: Al volver del contexto del proceso, reiniciamos la búsqueda
+        // desde la prioridad 0, ya que podría haber aparecido un proceso
+        // de mayor prioridad.
+        break; 
+      }
     }
     release(&ptable.lock);
 
@@ -396,6 +452,7 @@ yield(void)
 {
   acquire(&ptable.lock);  //DOC: yieldlock
   myproc()->state = RUNNABLE;
+  insert_prio_queue(myproc());
   sched();
   release(&ptable.lock);
 }
@@ -471,6 +528,7 @@ wakeup1(void *chan)
   for(p = ptable.proc; p < &ptable.proc[NPROC]; p++)
     if(p->state == SLEEPING && p->chan == chan)
       p->state = RUNNABLE;
+      insert_prio_queue(p);
 }
 
 // Wake up all processes sleeping on chan.
@@ -495,8 +553,11 @@ kill(int pid)
     if(p->pid == pid){
       p->killed = 1;
       // Wake process from sleep if necessary.
-      if(p->state == SLEEPING)
+      if(p->state == SLEEPING){
         p->state = RUNNABLE;
+        insert_prio_queue(p);
+      }
+
       release(&ptable.lock);
       return 0;
     }

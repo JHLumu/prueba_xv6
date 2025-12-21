@@ -16,6 +16,7 @@ UPROGS=\
 	zombie\
 	date\
 	dup2test\
+	exitwait\
 	tsbrk1\
 	tsbrk2\
 	tsbrk3\

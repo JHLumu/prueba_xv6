@@ -12,7 +12,7 @@ exec(char *path, char **argv)
 {
   char *s, *last;
   int i, off;
-  uint argc, sz, sp, ustack[3+MAXARG+1];
+  uint argc, sz, sp, ustack[3+MAXARG+1], pg;
   struct elfhdr elf;
   struct inode *ip;
   struct proghdr ph;
@@ -68,6 +68,11 @@ exec(char *path, char **argv)
   clearpteu(pgdir, (char*)(sz - 2*PGSIZE));
   sp = sz;
 
+  /** Boletin 2 Ejercicio 2
+   * Se calcula la dirección de inicio de la página de guarda.
+   */
+  pg = sz - (2*PGSIZE);
+
   // Push argument strings, prepare rest of stack in ustack.
   for(argc = 0; argv[argc]; argc++) {
     if(argc >= MAXARG)
@@ -99,6 +104,7 @@ exec(char *path, char **argv)
   curproc->sz = sz;
   curproc->tf->eip = elf.entry;  // main
   curproc->tf->esp = sp;
+  curproc->pg = pg; //Boletin 2 Ejercicio 2: Se almacena la página de guarda.
   switchuvm(curproc);
   freevm(oldpgdir, 1);
   return 0;

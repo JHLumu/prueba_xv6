@@ -466,7 +466,7 @@ scheduler(void)
     for(prio = 0; prio < NPRIO; prio++){
       if(ptable.ready[prio].head){
         // Encontramos un proceso en esta prioridad
-        p = remove_prio_queue_head(prio); // Sacamos el proceso de la cola [cite: 329, 398]
+        p = remove_prio_queue_head(prio); // Sacamos el proceso de la cola
 
         if(p->state != RUNNABLE){
            // Sanity check, no debería ocurrir si gestionamos bien las colas
